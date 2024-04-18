@@ -1,0 +1,47 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to AWS ECR  
+      - aws --version
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 339712894953.dkr.ecr.us-east-1.amazonaws.com
+      - REPOSITORY_URI=339712894953.dkr.ecr.us-east-1.amazonaws.com/hm-repo-ecr
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+  install:
+    runtime-versions:
+      nodejs: 16
+   
+    commands:
+      # install npm
+      - npm install
+       
+  build:
+    commands:
+      - echo Build started on 'date'
+      # run build script
+      # npm run-script build
+      - echo Building docker image
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - echo Build completed on 'date'
+      - echo pushing to REPOSITORY_URI
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image defination file...
+      # Give your container a name
+      - DOCKER_CONTAINER_NAME=backend-projecthm-container
+      - printf '[{"name":"%s","imageUri":"%s"}]' $DOCKER_CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG > imagedefinations.json
+      - echo printing imagedefinations.json
+      - cat imagedefinations.json
+     
+artifacts:
+  # include all files required to run application
+  # notably excluded is node_modules, as this will cause overwrite error on deploy
+  files:
+    - models/*
+    - package.json
+    - index.js
+    - imagedefinations.json
